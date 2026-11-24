@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="intro">
+  <div>
+    <h1>让图案<br><em>长进二维码。</em></h1>
+    <p>上传照片或 Logo，让原图的配色、轮廓和细节融进二维码。可用于门贴、桌牌或展签。</p>
+  </div>
+  <div class="intro-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+</section>
+{% if error %}<div class="error" role="alert">{{ error }} 提交失败后请重新附上文件，原始文件可继续使用。</div>{% endif %}
+<form method="post" action="{{ url_for('create') }}" enctype="multipart/form-data" class="setup" id="make">
+  <div class="step">
+    <h2>上传素材</h2>
+    <div class="field upload">
+      <label for="image">主参考图 <span>必填</span></label>
+      <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp" required>
+      <small>PNG、JPG 或 WebP，单张不超过 12 MB。</small>
+    </div>
+    <div class="crop-guide" id="preview" hidden><img id="source-preview" alt="上传图片与当前选区"><span id="crop-box"></span></div>
+    <div class="field">
+      <label for="url">网页链接</label>
+      <input type="url" id="url" name="url" placeholder="https://" value="{{ values.url }}">
+    </div>
+    <div class="field">
+      <label for="source_qr">或上传已有二维码</label>
+      <input type="file" id="source_qr" name="source_qr" accept="image/png,image/jpeg,image/webp">
+    </div>
+    <details>
+      <summary>附加素材</summary>
+      <div class="field"><label for="logo">字标或品牌 Logo</label><input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/webp"></div>
+      <div class="field"><label for="context">补充展示图</label><input type="file" id="context" name="context" accept="image/png,image/jpeg,image/webp"></div>
+      <label class="check"><input type="checkbox" name="isolate" id="isolate" value="1" {% if values.isolate %}checked{% endif %}> 在模拟展台提取实物主体</label>
+      <div class="field"><label for="background">上物实景底图</label><input type="file" id="background" name="background" accept="image/png,image/jpeg,image/webp"><small>用不带其他二维码的底图。桌牌照片可在商品旁预留一块空台面。</small></div>
+      <div class="field"><label for="scene_mount">预览摆放方式</label>
+        <select id="scene_mount" name="scene_mount">
+          <option value="flush" {% if values.scene_mount == "flush" %}selected{% endif %}>贴在玻璃、墙面或包装上</option>
+          <option value="standing" {% if values.scene_mount == "standing" %}selected{% endif %}>桌面立放 · 三角折脚</option>
+          <option value="print-paper" {% if values.scene_mount == "print-paper" %}selected{% endif %}>在现有纸贴或印刷面上印刷</option>
+          <option value="print-glass" {% if values.scene_mount == "print-glass" %}selected{% endif %}>在现有玻璃贴膜上印刷</option>
+        </select>
+      </div>
+      <div class="field" id="surface-setup" hidden>
+        <small>选择已经带有空白纸面或贴膜的底图，顺时针点出同一面的左上、右上、右下、左下。圆贴用外接四边形。</small>
+        <div class="scene-picker" id="scene-picker" hidden>
+          <img id="scene-photo" alt="用于定位印刷面的场景图">
+          <div class="scene-markers" id="scene-markers" aria-hidden="true"></div>
+        </div>
+        <label for="scene_corners">四角坐标 (%)</label>
+        <input id="scene_corners" name="scene_corners" value="{{ values.scene_corners }}" placeholder="10,20;70,20;70,80;10,80" autocomplete="off">
+        <button id="scene-reset" class="secondary scene-reset" type="button">清除定位</button>
+      </div>
+      <div class="row" id="scene-simple">
+        <div class="field"><label for="scene_x">中心左右 (%)</label><input type="number" name="scene_x" id="scene_x" value="{{ values.scene_x }}" min="0" max="100" step=".1"></div>
+        <div class="field"><label for="scene_y">中心上下 (%)</label><input type="number" name="scene_y" id="scene_y" value="{{ values.scene_y }}" min="0" max="100" step=".1"></div>
+        <div class="field"><label for="scene_width">预览宽度 (%)</label><input type="number" name="scene_width" id="scene_width" value="{{ values.scene_width }}" min="20" max="90" step=".1"></div>
+      </div>
+    </details>
+  </div>
+  <div class="step">
+    <h2>确定版式</h2>
+    <div class="field">
+      <label for="layout">物料类型</label>
+      <select id="layout" name="layout">{% for key, label in layouts.items() %}<option value="{{ key }}" {% if values.layout == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    </div>
+    <div class="row">
+      <div class="field"><label for="width">宽度 (mm)</label><input id="width" name="width" type="number" min="45" max="260" step=".01" value="{{ values.width }}" required></div>
+      <div class="field"><label for="height">高度 (mm)</label><input id="height" name="height" type="number" min="45" max="260" step=".01" value="{{ values.height }}" required></div>
+      <div class="field"><label for="qr_percent">码区占短边 (%)</label><input id="qr_percent" name="qr_percent" type="number" min="52" max="80" step=".1" value="{{ values.qr_percent }}" required></div>
+    </div>
+    <div class="field"><label for="title">物料标题</label><input id="title" name="title" maxlength="60" placeholder="店名或展品名" value="{{ values.title }}"></div>
+    <div class="field"><label for="caption">扫码提示</label><input id="caption" name="caption" maxlength="85" value="{{ values.caption }}"></div>
+    <div class="field"><label for="brief">用途和图案要求</label><textarea id="brief" name="brief" maxlength="450" rows="2" placeholder="想做一张咖啡吧台牌，保留照片里的白色拉花。">{{ values.brief }}</textarea><small>可以写用途，以及需要保留的细线、字母或主色。想突出图中某一块，可以在下方选择取景。</small></div>
+    <details id="focus-details">
+      <summary>调整进码图案</summary>
+      <div class="field"><label for="frame">构图方式</label><select id="frame" name="frame"><option value="full" {% if values.frame == "full" %}selected{% endif %}>保留全图</option><option value="crop" {% if values.frame == "crop" %}selected{% endif %}>选取局部</option></select></div>
+      <div class="row">
+        <div class="field"><label for="focus_x">重点左右 (%)</label><input type="number" name="focus_x" id="focus_x" value="{{ values.focus_x }}" min="0" max="100"></div>
+        <div class="field"><label for="focus_y">重点上下 (%)</label><input type="number" name="focus_y" id="focus_y" value="{{ values.focus_y }}" min="0" max="100"></div>
+        <div class="field"><label for="zoom">取景边长 (%)</label><input type="number" name="zoom" id="zoom" value="{{ values.zoom }}" min="12" max="100"></div>
+      </div>
+      <small>取景边长以原图短边为 100%。选取局部时可点图或调整数值，选出你想做进码点的部分。</small>
+      <div class="field"><label for="graphic">码面风格</label><select id="graphic" name="graphic">
+        <option value="fusion" {% if values.graphic == "fusion" %}selected{% endif %}>原图融合 · 柔彩墨线与彩色嵌片</option>
+        <option value="illustrated" {% if values.graphic == "illustrated" %}selected{% endif %}>原图共绘 · 归并色块</option>
+        <option value="photo" {% if values.graphic == "photo" %}selected{% endif %}>原色照片</option>
+        <option value="rounded" {% if values.graphic == "rounded" %}selected{% endif %}>色块与圆角点阵</option>
+        <option value="mosaic" {% if values.graphic == "mosaic" %}selected{% endif %}>彩色方格</option>
+      </select></div>
+      <div class="field"><label for="art_px">原图融合成码边长 (px)</label><input type="number" name="art_px" id="art_px" value="{{ values.art_px }}" min="120" max="2400" step="1"><small>留空时按默认尺寸导出。</small></div>
+      <div class="field"><label for="detail">提取方式</label><select id="detail" name="detail"><option value="tone" {% if values.detail == "tone" %}selected{% endif %}>保留原色与轮廓</option><option value="relief" {% if values.detail == "relief" %}selected{% endif %}>浅浮雕与细纹</option></select></div>
+      <label class="check"><input type="checkbox" name="invert" value="1" {% if values.invert %}checked{% endif %}> 反转图案颜色</label>
+    </details>
+  </div>
+  <div class="submit-row"><p id="busy" aria-live="polite">生成两稿，并逐一读取完整物料。</p><button class="primary" type="submit">生成设计候选 <span aria-hidden="true">↗</span></button></div>
+</form>
+{% endblock %}

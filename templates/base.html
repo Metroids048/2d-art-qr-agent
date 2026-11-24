@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}纸间 · 艺术二维码工作台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
+  <script src="{{ url_for('static', filename='studio.js') }}" defer></script>
+</head>
+<body>
+  <header class="site-head">
+    <a href="/" class="wordmark"><span class="stamp" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>纸间 <small>ART QR STUDIO</small></span></a>
+    <span class="local"><b></b>本地工作台</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer class="site-foot"><span>纸间 · 艺术二维码工作台</span><span>文件保存在本机</span></footer>
+</body>
+</html>

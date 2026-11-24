@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ job.settings.title }} · 纸间{% endblock %}
+{% set style = job.settings %}
+{% block content %}
+<section class="result-intro">
+  <a class="back" href="/">← 新建设计</a>
+  <div class="result-heading">
+    <div><h1>{{ style.title }}</h1><p>{{ layouts[style.layout] }} · {{ style.width }} × {{ style.height }} mm · {{ job.id }}</p></div>
+    {% if job.selected %}<a class="primary" href="#delivery">下载选定稿 ↓</a>{% endif %}
+  </div>
+  {% if style.layout_cue %}<p>用途匹配依据「{{ style.layout_cue }}」</p>{% endif %}
+  <div class="payload"><span>{{ "原码解析" if job.payload_source == "original-qr" else "填写的链接" }}</span><code>{{ job.payload }}</code></div>
+</section>
+<section class="study" aria-labelledby="submitted-input">
+  <div><h2 id="submitted-input">本次实际输入</h2>
+    {% if style.brief %}<p class="submitted-brief">{{ style.brief }}</p>{% endif %}
+    <p><a href="{{ url_for('crop', job_id=job.id) }}">查看制作时选中的取景</a></p>
+  </div>
+  <div class="source-list">
+    {% for field, source in job.inputs.items() %}
+    {% set original = url_for('original_input', job_id=job.id, field=field) %}
+    <figure data-input-field="{{ field }}">
+      <a href="{{ original }}"><img src="{{ original }}" alt="{{ input_names[field] }}"></a>
+      <figcaption>{{ input_names[field] }} · {{ source.original_name }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% for key, candidate in job.candidates.items() %}
+{% set report = reports[key] %}
+{% set fusion = style.graphic == "fusion" %}
+<article class="candidate {% if job.selected == key %}selected{% endif %}" id="{{ key }}">
+  <header class="candidate-head">
+    <div><h2>{{ candidate.style }}{% if job.selected == key %}<small class="state">已选定</small>{% endif %}</h2>
+      <p>{{ report.modules }} × {{ report.modules }} 格 · 四模块净空 · 码区 {{ candidate.placement.qr_with_quiet_mm[2] }} mm</p></div>
+    {% if candidate.selectable and job.selected != key and not candidate.visual_review_required %}
+    <form method="post" action="{{ url_for('select', job_id=job.id, key=key) }}"><button class="secondary" type="submit">选这稿 <span aria-hidden="true">↗</span></button></form>
+    {% elif not candidate.selectable %}
+    {% if report.art_opencv_misses %}
+    <span class="state bad">OpenCV 待读 · {% for name in report.art_opencv_misses %}{{ names[name] }}{{ "、" if not loop.last }}{% endfor %}</span>
+    {% else %}
+    <span class="state bad">{{ "玻璃整景读码待调整" if report.scene_opencv_required and not report.scene_opencv_matched else "读码待调整" }}</span>
+    {% endif %}
+    {% endif %}
+  </header>
+  <div class="assets">
+    {% if fusion %}
+    {% set original = url_for('original_input', job_id=job.id, field='image') %}
+    <figure><a href="{{ original }}"><img src="{{ original }}" alt="与成稿对照的上传原图"></a><figcaption>上传原图</figcaption></figure>
+    {% endif %}
+    {% for name in (("art-qr.png", "flat.png", "mockup.png") if fusion else ("motif.png", "art-qr.png", "flat.png", "mockup.png")) %}
+    <figure><a href="{{ url_for('asset', job_id=job.id, key=key, name=name) }}" target="_blank" rel="noopener"><img src="{{ url_for('asset', job_id=job.id, key=key, name=name) }}" alt="{{ names[name] }}"></a><figcaption>{{ names[name] }}{% if name == "mockup.png" and style.scene_mode %}<small> · {{ "材质印刷模拟" if style.print_corners else "上传底照合成" if style.scene_mode == "uploaded" else "数字场景" }}</small>{% endif %}</figcaption></figure>
+    {% endfor %}
+  </div>
+  {% if fusion and candidate.selectable and job.selected != key %}
+  <form class="visual-review" method="post" action="{{ url_for('select', job_id=job.id, key=key) }}">
+    <label class="check"><input type="checkbox" name="visual_review" value="1" required>
+      原图的主体、配色和关键细节依然可辨，码点和三处定位角与画面融为一体。
+    </label>
+    <button class="secondary" type="submit">确认画面并选这稿 <span aria-hidden="true">↗</span></button>
+  </form>
+  {% endif %}
+  {% if report.display_sizes_px %}
+  <details class="reads" {% if candidate.visual_review_required %}open{% endif %}>
+    <summary>按 240 px 和 320 px 查看整张码面</summary>
+    <div class="display-samples">
+      {% if candidate.visual_review_required %}
+      {% set source = url_for('original_input', job_id=job.id, field='image') %}
+      <figure>
+        <a href="{{ source }}"><img class="review-source" src="{{ source }}" width="180" height="240" alt="对照用原图"></a>
+        <figcaption>上传原图</figcaption>
+      </figure>
+      {% endif %}
+      {% for side in report.display_sizes_px %}
+      {% set name = "art-qr-" ~ side ~ ".png" %}
+      <figure>
+        <a href="{{ url_for('asset', job_id=job.id, key=key, name=name) }}"><img src="{{ url_for('asset', job_id=job.id, key=key, name=name) }}" width="{{ side }}" height="{{ side }}" alt="{{ side }} px 艺术码"></a>
+        <figcaption>{{ side }} × {{ side }} px</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    {% if candidate.visual_review_required and candidate.selectable and job.selected != key %}
+    <form class="visual-review" method="post" action="{{ url_for('select', job_id=job.id, key=key) }}">
+      <label class="check"><input type="checkbox" name="visual_review" value="1" required>
+        两个尺寸都能第一眼认出原图的主体和关键特征，码点与三处定位角一起构图。
+      </label>
+      <button class="secondary" type="submit">确认画面并选这稿 <span aria-hidden="true">↗</span></button>
+    </form>
+    {% endif %}
+  </details>
+  {% endif %}
+  <details class="reads">
+    <summary>整图读码明细</summary>
+    <div class="matrix-wrap"><table class="matrix">
+      <thead><tr><th>文件及尺寸</th><th>macOS Vision</th><th>OpenCV</th></tr></thead>
+      <tbody>
+      {% for name, entry in report.files.items() %}
+      {% for row in entry.sizes %}
+      <tr><th>{{ names[name] }} <span>{{ row.size[0] }} × {{ row.size[1] }}</span></th>
+        <td class="{% if row.vision_match %}yes{% else %}no{% endif %}">{{ "匹配" if row.vision_match else ("载荷不同" if row.vision else "未读出") }}
+          {% if row.vision %}<code>{{ row.vision|join(" · ") }}</code>{% endif %}</td>
+        <td class="{% if row.opencv_match %}yes{% else %}no{% endif %}">{{ "匹配" if row.opencv_match else ("载荷不同" if row.opencv else "未读出") }}
+          {% if row.opencv %}<code>{{ row.opencv }}</code>{% endif %}</td></tr>
+      {% endfor %}{% endfor %}
+      </tbody>
+    </table></div>
+    <p>透明平稿以白底参与读码，打样 PDF 按 300 dpi 栅格化。上物为数字模拟。</p>
+  </details>
+  <div class="scan-line">
+    {% for item in ("art-qr.png", "flat.png", "mockup.png") %}{% set s = candidate.status[item] %}
+    <span><b>{{ names[item] }}</b> Vision {{ s.vision }}/{{ s.count }} · OpenCV {{ s.opencv }}/{{ s.count }}</span>
+    {% endfor %}
+  </div>
+</article>
+{% endfor %}
+{% if job.selected %}
+<section class="delivery" id="delivery">
+  {% set pos = job.candidates[job.selected].placement.qr_with_quiet_mm %}
+  <div><h2>下载选定稿</h2>
+    <p>成品 {{ style.width }} × {{ style.height }} mm。码区从左 {{ pos[0] }} mm、从上 {{ pos[1] }} mm 开始，含净空边长 {{ pos[2] }} mm。</p>
+    <p>按原尺寸打样。刀线示意标出裁切边界，读码结果以数字文件为准。</p></div>
+  <a class="primary" href="{{ url_for('bundle', job_id=job.id) }}">整套文件 ZIP ↓</a>
+  <div class="downloads">
+    {% for name in job.candidates[job.selected].files %}<a href="{{ url_for('asset', job_id=job.id, key=job.selected, name=name, download=1) }}">{{ names[name] }} ↓</a>{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
